@@ -1,0 +1,183 @@
+---
+- hosts: all
+  become: yes
+  vars_files:
+    - env_variables
+  tasks:
+    #  - name: Delete file kubernetes.repo
+    #    file:
+    #      path: /etc/yum.repos.d/kubernetes.repo
+    #      state: absent
+
+    - name: Add Kubernetes yum repository
+      yum_repository:
+        name: Kubernetes
+        description: Kubernetes Repository
+        baseurl: http://yum.kubernetes.io/repos/kubernetes-el7-x86_64
+        enabled: yes
+        gpgcheck: yes
+        gpgkey:
+          - https://packages.cloud.google.com/yum/doc/yum-key.gpg
+          - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+    #  - name: Remove docker if installed from CentOS repo
+    #    yum:
+    #      name:
+    #        - docker
+    #        - docker-client
+    #        - docker-client-latest
+    #        - docker-common
+    #        - docker-latest
+    #        - docker-latest-logrotate
+    #        - docker-logrotate
+    #        - docker-engine
+    #      state: absent
+
+    - name: Install required pkgs
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+        state: present
+
+    - name: Add Docker repository
+      command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Install Docker
+      yum:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+
+    #  - name: Daemon.json delete file
+    #    file:
+    #     path: /etc/docker/daemon.json
+    #     state: absent
+
+    - name: Check directory /etc/docker
+      stat:
+        path: /etc/docker
+      register: mydocker
+
+    - name: "echo if directory already exited"
+      debug:
+        msg: "the directory is already existed"
+      when: mydocker.stat.exists
+
+    - name: Create directory if no exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: 0755
+        group: root
+        owner: root
+      when: mydocker.stat.exists == false
+
+    - name: Create a repository file for daemon.json
+      file:
+        path: /etc/docker/daemon.json
+        state: touch
+
+    - name: Adding details in daemon.json file.
+      blockinfile:
+        path: /etc/docker/daemon.json
+        block: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"]
+          }
+
+    - name: remove {mark} ansible...
+      lineinfile:
+        path: /etc/docker/daemon.json
+        regexp: "#"
+        state: absent
+
+    - name: Stop Docker service
+      service:
+        name: docker
+        state: stopped
+      register: output
+
+    #  - debug:
+    #     var: output
+
+    - name: Restart Docker service
+      service:
+        name: docker
+        state: restarted
+      register: output2
+
+    #  - debug:
+    #     var: output2
+
+    - name: Start Docker service & enable
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Enabled/Started firewall
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Installing required packages
+      yum:
+        name: "{{ packages }}"
+        state: present
+
+    - name: Starting and Enabling the required services
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      with_items: "{{ services }}"
+
+    #  - name: Remove Firewalld
+    #    shell: firewall-cmd --permanent --remove-port=6443/tcp | firewall-cmd --permanent --remove-port=2379-2380/tcp |  firewall-cmd --permanent --remove-port=10250-10252/tcp | firewall-cmd --permanent --remove-port=8285/udp| firewall-cmd --permanent --remove-port=8472/udp
+
+    - name: Allow Network Ports in Firewalld
+      firewalld:
+        port: "{{ item }}"
+        state: enabled
+        permanent: yes
+        immediate: yes
+      with_items: "{{ master_ports if ('master' in group_names) else worker_ports }}"
+
+    - name: restart firewalld
+      shell: systemctl restart firewalld
+
+    - name: Install Modprobe
+      shell: modprobe br_netfilter |  modprobe overlay
+
+    - name: ADD masquerade
+      shell: firewall-cmd --add-masquerade --permanent
+
+    - name: Reload firewalld
+      shell: firewall-cmd --reload
+
+    - name: Enabling Bridge Firewall Rule-iptables
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Enabling Bridge Firewall Rule-iptables
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Load settings from all system configuration files
+      shell:
+        cmd: sysctl --system

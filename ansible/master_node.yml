@@ -1,0 +1,4 @@
+---
+- import_playbook: roles/prerequisites.yml
+- import_playbook: roles/setting_up_nodes.yml
+- import_playbook: roles/confi_master.yml

@@ -1,12 +1,16 @@
 [all:vars]
-ansible_user=<YOUR ANSIBLE USER>
+ansible_user=adminUserName
 
 [master]
-master
+10.0.1.10 ansible_host=10.0.1.10
 
 [workers]
-worker1
-worker2
+10.0.1.11 ansible_host=10.0.1.11
+10.0.1.12 ansible_host=10.0.1.12
 
 [nfs]
-nfs
+10.0.1.13
+
+[kubernetes:children]
+workers
+master

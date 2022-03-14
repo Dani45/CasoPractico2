@@ -1,0 +1,50 @@
+---
+- hosts: master
+  become: yes
+  vars_files:
+    - env_variables
+  tasks:
+    - name: Pulling images required for setting up a Kubernetes cluster
+      command: kubeadm config images pull
+
+    - name: Resetting kubeadm
+      shell: kubeadm reset -f
+
+    - name: Initializing Kubernetes cluster
+      shell: kubeadm init --pod-network-cidr={{cidr_v}}
+      register: output
+
+    # - name: Storing Logs and Generated token for future purpose.
+    #   local_action: copy content={{ output.stdout }} dest="/tmp/kubernetes_join_cmd" mode=0777
+
+    - name: create de file .kube
+      file:
+        path: /$HOME/.kube
+        state: directory
+
+    - name: Copying required files and access root
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: $HOME/.kube/config
+        remote_src: yes
+        owner: root
+        group: root
+
+    - name: Configuring flannel
+      command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+    - name: Deploy ingress-controller
+      command: kubectl apply -f https://raw.githubusercontent.com/haproxytech/kubernetes-ingress/master/deploy/haproxy-ingress.yaml
+
+    - name: Generating token for k8s
+      shell: kubeadm token create --print-join-command
+      register: token_master
+
+    - name: Token
+      debug:
+        msg: "{{ token_master.stdout }}"
+
+    - name: adding host for token in
+      add_host:
+        name: "token"
+        token_k8s: "{{ token_master.stdout }}"

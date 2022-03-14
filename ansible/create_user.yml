@@ -1,0 +1,17 @@
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: create the devops user account
+      user: name=devops append=yes state=present createhome=yes shell=/bin/bash
+
+    - name: allow 'devops' to use sudo without needing a password
+      lineinfile:
+        dest: /etc/sudoers
+        line: "devops ALL=(ALL) NOPASSWD: ALL"
+        validate: "visudo -cf %s"
+
+    - name: set up authorized keys for the devops user
+      authorized_key: user=devops key="{{item}}"
+      with_file:
+        - ~/.ssh/id_rsa.pub

@@ -1,0 +1,15 @@
+---
+- hosts: workers
+  become: yes
+  vars_files:
+    - env_variables
+  tasks:
+    - name: Copy join command from Ansiblehost to the worker nodes.
+      copy:
+        src: /tmp/kubernetes_join_cmd
+        dest: /tmp/kubernetes_join_cmd
+        mode: 0777
+
+    - name: Join the Worker nodes to the cluster.
+      command: sh /tmp/kubernetes_join_cmd
+      register: joined_or_not

@@ -3,7 +3,7 @@
 Para la corección automática el repositorio deberá tener la siguiente estructura:
 
 ```console
-[jadebustos@archimedes cp2]$ tree .
+tree .
 .
 ├── ansible
 │   ├── deploy.sh
@@ -14,7 +14,6 @@ Para la corección automática el repositorio deberá tener la siguiente estruct
     └── credentials.tf
 
 2 directories, 5 files
-[jadebustos@archimedes cp2]$
 ```
 
 ## Terraform
